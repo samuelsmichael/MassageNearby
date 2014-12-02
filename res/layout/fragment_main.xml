@@ -1,0 +1,36 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@android:color/darker_gray" 
+	tools:context="com.diamond.android.massagenearby.MainActivity$PlaceholderFragment"
+    >
+     
+    <FrameLayout
+        android:id="@+id/container2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+    
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_alignParentBottom="true"
+        android:layout_height="wrap_content"
+        android:background="@android:color/white" >
+        <Button
+            android:id="@+id/send_btn"
+            style="?android:attr/buttonStyleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:text="Send" />
+        <EditText
+            android:id="@+id/msg_edit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignBottom="@+id/send_btn"
+            android:layout_toLeftOf="@+id/send_btn" >
+        </EditText>
+    </RelativeLayout>
+ 
+</RelativeLayout>
