@@ -8,6 +8,7 @@ import java.net.SocketException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.concurrent.Semaphore;
 
 import com.diamond.android.massagenearby.sockets.ServerUtilities;
 
@@ -181,15 +182,21 @@ public class MainActivity extends Activity
         	sm.setChatId(fragment.profileChatId);
             return fragment;
         }
-
+        ServerUtilities su=new ServerUtilities();
+        Semaphore stick = new Semaphore(0);
     	private void send(final String txt) {
+    		final String txt2=txt;
             new AsyncTask<Void, Void, String>() {
                 @Override
                 protected String doInBackground(Void... params) {
                     String msg = "";
                     try {
-                    	msg = ServerUtilities.send(txt, profileChatId,((ApplicationMassageNearby)getActivity().getApplication()));
-                        
+                    	msg = su.send(txt2, profileChatId,((ApplicationMassageNearby)getActivity().getApplication()),stick,(MainActivity)getActivity());
+                    	try {
+                    		stick.acquire();
+                    	} catch (Exception ee) {
+                    		return null;
+                    	}
             			ContentValues values = new ContentValues(2);
             			values.put(DataProvider.COL_MSG, txt);
             			values.put(DataProvider.COL_TO, profileChatId);

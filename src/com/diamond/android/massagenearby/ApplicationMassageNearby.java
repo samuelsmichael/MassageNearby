@@ -5,21 +5,23 @@ import java.util.ArrayList;
 import android.app.Activity;
 import android.app.Application;
 import android.content.SharedPreferences;
+import android.os.Handler;
 import android.widget.ArrayAdapter;
 
 public class ApplicationMassageNearby extends Application {
 	private SharedPreferences mSharedPreferences=null;
 	private SettingsManager mSettingsManager=null;
-	ItemMasseur mItemMasseur;
-	ArrayList<Object> mAllMasseurs;
+	public ItemMasseur mItemMasseur;
+	public ArrayList<Object> mAllMasseurs;
+	public Handler handler = new Handler();
 	ArrayAdapter aa;
 	public static final String PROFILE_ID = "profile_id";
 	
 	//parameters recognized by demo server
-	public static final String FROM = "chatId";
+	public static final String FROM = "chatIdFrom";
 	public static final String REG_ID = "regId";
 	public static final String MSG = "msg";
-	public static final String TO = "chatId2";	
+	public static final String TO = "chatIdTo";	
 
 	
 
@@ -47,5 +49,19 @@ public class ApplicationMassageNearby extends Application {
 		} else {
 			return null;
 		}
+	}
+
+	public int getOrdinalOfMasseursHavingName(String name) {
+		int x=0;
+		int retValue=-1;
+		for (Object masseur: this.mAllMasseurs) {
+			if(((ItemMasseur)masseur).getmName().equalsIgnoreCase(name)) {
+				retValue=x;
+				break;
+			}
+			x++;
+		}
+			
+		return retValue;
 	}
 }

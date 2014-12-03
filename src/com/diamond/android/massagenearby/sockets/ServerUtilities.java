@@ -16,20 +16,32 @@
 package com.diamond.android.massagenearby.sockets;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
+import java.net.Socket;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import com.diamond.android.massagenearby.ApplicationMassageNearby;
+import com.diamond.android.massagenearby.DataProvider;
+import com.diamond.android.massagenearby.ItemMasseur;
+import com.diamond.android.massagenearby.MainActivity;
+
 
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 
+import android.content.ContentValues;
+import android.text.TextUtils;
 import android.util.Log;
 
 
@@ -38,7 +50,7 @@ import android.util.Log;
  * Helper class used to communicate with the demo server.
  */
 public final class ServerUtilities {
-	
+	public static final int SERVERPORT = 8080;
 	private static final String TAG = "ServerUtilities";
 
     private static final int MAX_ATTEMPTS = 5;
@@ -48,43 +60,23 @@ public final class ServerUtilities {
     /**
      * Send a message.
      */
-    public static String send(String msg, String to, ApplicationMassageNearby amn) throws IOException {
+    public  String send(String msg, String to, ApplicationMassageNearby amn,Semaphore stick,MainActivity ac) throws IOException {
         //Log.i(TAG, "sending message (msg = " + msg + ")");
         Map<String, String> params = new HashMap<String, String>();
         params.put(ApplicationMassageNearby.MSG, msg);
         params.put(ApplicationMassageNearby.FROM, amn.getSettingsManager().getChatId());
         params.put(ApplicationMassageNearby.TO, to);        
         
-        return post(null, params, MAX_ATTEMPTS);
+        return post(params, MAX_ATTEMPTS,amn, stick, ac);
     }
     
-    /**
-     * Issue a POST request to the server.
-     *
-     * @param endpoint POST address.
-     * @param params request parameters.
-     * @return response
-     * @throws IOException propagated from POST.
-     */
-    private static String executePost(String endpoint, Map<String, String> params) throws IOException {
-    	/*
-    	 * if allMasseurs[the one I'm trying to talk to]'s socket ==null
-    	 * 		create a socket
-    	 * 			and if fails, try re-getting that guy (and putting him into allMasseurs)
-    	 * 				and try again
-    	 *		Note: if time's out, then throw exception
-    	 * otherwise, send the msg (pre-pending my Name, so other guy knows who he's talking to, and can add him to his list on the left {name, socket}
-    	 */
-    	return null;
-      }
-    
     /** Issue a POST with exponential backoff */
-    private static String post(String endpoint, Map<String, String> params, int maxAttempts) throws IOException {
+    private  String post(Map<String, String> params, int maxAttempts,ApplicationMassageNearby amn, Semaphore stick, MainActivity ma) throws IOException {
     	long backoff = BACKOFF_MILLI_SECONDS + random.nextInt(1000);
     	for (int i = 1; i <= maxAttempts; i++) {
     		Log.d(TAG, "Attempt #" + i + " to connect");
     		try {
-    			return executePost(endpoint, params);
+    			return executePost( params,amn, stick,ma);
     		} catch (IOException e) {
     			Log.e(TAG, "Failed on attempt " + i + ":" + e);
     			if (i == maxAttempts) {
@@ -98,9 +90,137 @@ public final class ServerUtilities {
                 }
                 backoff *= 2;    			
     		} catch (IllegalArgumentException e) {
+    			stick.release();
     			throw new IOException(e.getMessage(), e);
+    		}
+    		finally {
+
     		}
     	}
     	return null;
     }
+
+    
+    /**
+     * Issue a POST request to the server.
+     *
+     * @param endpoint POST address.
+     * @param params request parameters.
+     * @return response
+     * @throws IOException propagated from POST.
+     */
+    private String executePost(Map<String, String> params,ApplicationMassageNearby amn, Semaphore stick, MainActivity ma) throws IOException {
+    	String toId=params.get(ApplicationMassageNearby.TO);
+    	ItemMasseur im=(ItemMasseur)amn.mAllMasseurs.get(Integer.valueOf(toId)-1);
+    	Semaphore stick2=new Semaphore(0);
+    	if(im.getmSocket()!=null) {
+            PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(im.getmSocket()
+                    .getOutputStream())), true);
+            // WHERE YOU ISSUE THE COMMANDS
+            out.println(amn.mItemMasseur.getmName()+"~"+params.get(ApplicationMassageNearby.MSG));
+      	 	stick.release();
+    	} else {
+    		
+            Thread cThread = new Thread(new ClientThread(im,amn,stick2,ma));
+            cThread.start();
+    		try {
+    			stick2.acquire();
+                PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(im.getmSocket()
+                        .getOutputStream())), true);
+                // WHERE YOU ISSUE THE COMMANDS
+                out.println(amn.mItemMasseur.getmName()+"~"+params.get(ApplicationMassageNearby.MSG));
+           	 	stick.release();
+    		} catch (Exception e) {
+    			return "oops";
+    		}
+    	}
+    	
+    	/*
+    	 * if allMasseurs[the one I'm trying to talk to]'s socket ==null
+    	 * 		create a socket
+    	 * 			and if fails, try re-getting that guy (and putting him into allMasseurs)
+    	 * 				and try again
+    	 *		Note: if time's out, then throw exception
+    	 * otherwise, send the msg (pre-pending my Name, so other guy knows who he's talking to, and can add him to his list on the left {name, socket}
+    	 */
+    	return null;
+      }
+    public class ClientThread implements Runnable {
+    	String mIpAddress;
+    	ItemMasseur mMasseur;
+    	ApplicationMassageNearby mAmn;
+    	Semaphore mStick2;
+    	MainActivity mMa;
+    	public ClientThread(ItemMasseur masseur,ApplicationMassageNearby amn, Semaphore stick2, MainActivity ma) {
+    		mIpAddress=masseur.getmURL();
+    		mMasseur=masseur;
+    		mAmn=amn;
+    		mStick2=stick2;
+    		mMa=ma;
+    	}
+  
+        public void run() {
+            try {
+                InetAddress serverAddr = InetAddress.getByName(mIpAddress);
+                Log.d("ClientActivity", "C: Connecting...");
+                mMasseur.setmSocket( new Socket(serverAddr, SERVERPORT));
+                mMasseur.setmConnected(true);
+                Thread cThread = new Thread(new ClientThreadReceive(mMasseur,mAmn,mMa));
+                cThread.start();
+               	mStick2.release();
+               
+            } catch (Exception e) {
+                Log.e("ClientActivity", "C: Error", e);
+                mMasseur.setmConnected(false);
+            }
+        }
+    }
+    public class ClientThreadReceive implements Runnable {
+    	ItemMasseur mMasseur;
+    	String line;
+    	ApplicationMassageNearby mAmn;
+    	MainActivity mMa;
+    	public ClientThreadReceive(ItemMasseur masseur,ApplicationMassageNearby amn, MainActivity ma) {
+    		mMasseur=masseur;
+    		mAmn=amn;
+    		mMa=ma;
+    	}
+		@Override
+		public void run() {
+			while(true) {
+				try {
+                BufferedReader in = new BufferedReader(new InputStreamReader(mMasseur.getmSocket().getInputStream()));
+                line = null;
+                while ((line = in.readLine()) != null) {
+                    Log.d("ServerActivity", line);
+                    mAmn.handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                        	if(!TextUtils.isEmpty(line)) {
+	                        	String[] sa=line.split("\\~", -1);
+	                        	String name=sa[0];
+	                        	String msg=sa[1];
+	                        	int profileChatId=mAmn.getOrdinalOfMasseursHavingName(name);
+	                        	String moi=mAmn.mItemMasseur.getmName();
+	                        	int profileChatIdMoi=mAmn.getOrdinalOfMasseursHavingName(moi);
+	                        	if(profileChatId!=-1) {
+		                			ContentValues values = new ContentValues(2);
+		                			values.put(DataProvider.COL_MSG, msg);
+		                			values.put(DataProvider.COL_FROM, String.valueOf(profileChatId+1));
+		                			values.put(DataProvider.COL_TO, String.valueOf(profileChatIdMoi+1));
+		                			mMa.getContentResolver().insert(DataProvider.CONTENT_URI_MESSAGES, values);
+	                        	}
+                        	}
+                        }
+                    });
+                }
+
+				} catch (Exception e) {
+					break;
+				}
+			}
+		}
+    	
+    }
+
 }

@@ -45,4 +45,17 @@ public class ItemMasseur {
 	String mURL;
 	boolean mIsOnline;
 	Socket mSocket;
+	boolean mConnected=false;
+	/**
+	 * @return the mConnected
+	 */
+	public boolean ismConnected() {
+		return mConnected;
+	}
+	/**
+	 * @param mConnected the mConnected to set
+	 */
+	public void setmConnected(boolean mConnected) {
+		this.mConnected = mConnected;
+	}
 }
