@@ -1,4 +1,4 @@
-package com.diamond.android.massagenearby;
+package com.diamond.android.massagenearby.model;
 
 import java.net.Socket;
 

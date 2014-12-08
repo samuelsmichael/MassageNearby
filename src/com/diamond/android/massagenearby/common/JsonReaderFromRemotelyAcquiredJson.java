@@ -1,4 +1,4 @@
-package com.diamond.android.massagenearby;
+package com.diamond.android.massagenearby.common;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;

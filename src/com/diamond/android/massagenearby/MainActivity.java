@@ -10,40 +10,37 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.concurrent.Semaphore;
 
-import com.diamond.android.massagenearby.sockets.ServerUtilities;
-
-import android.app.Activity;
-
 import android.app.ActionBar;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DialogFragment;
 import android.app.Fragment;
 import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.app.ProgressDialog;
 import android.content.ContentValues;
-import android.content.Context;
 import android.content.DialogInterface;
-import android.net.ConnectivityManager;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.widget.DrawerLayout;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.support.v4.widget.DrawerLayout;
-import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
+
+import com.diamond.android.massagenearby.common.AcquireDataRemotelyAsynchronously;
+import com.diamond.android.massagenearby.common.DataGetter;
+import com.diamond.android.massagenearby.common.JsonReaderFromRemotelyAcquiredJson;
+import com.diamond.android.massagenearby.common.ParsesJsonMasseur;
+import com.diamond.android.massagenearby.common.WaitingForDataAcquiredAsynchronously;
+import com.diamond.android.massagenearby.model.ItemMasseur;
+import com.diamond.android.massagenearby.sockets.ServerUtilities;
 
 
 public class MainActivity extends Activity
@@ -163,11 +160,14 @@ public class MainActivity extends Activity
     	private EditText msgEdit;
     	private Button btnSend;
     	String profileChatId;
+    	ProgressDialog mChattingDialog;
+
         /**
          * The fragment argument representing the section number for this
          * fragment.
          */
         private static final String ARG_SECTION_NUMBER = "section_number";
+		protected static final String TAG = "PFT";
 
         /**
          * Returns a new instance of this fragment for the given section
@@ -183,40 +183,10 @@ public class MainActivity extends Activity
             return fragment;
         }
         ServerUtilities su=new ServerUtilities();
-        Semaphore stick = new Semaphore(0);
-    	private void send(final String txt) {
-    		final String txt2=txt;
-            new AsyncTask<Void, Void, String>() {
-                @Override
-                protected String doInBackground(Void... params) {
-                    String msg = "";
-                    try {
-                    	msg = su.send(txt2, profileChatId,((ApplicationMassageNearby)getActivity().getApplication()),stick,(MainActivity)getActivity());
-                    	try {
-                    		stick.acquire();
-                    	} catch (Exception ee) {
-                    		return null;
-                    	}
-            			ContentValues values = new ContentValues(2);
-            			values.put(DataProvider.COL_MSG, txt);
-            			values.put(DataProvider.COL_TO, profileChatId);
-            			getActivity().getContentResolver().insert(DataProvider.CONTENT_URI_MESSAGES, values);
-            			
-                    } catch (IOException ex) {
-                        msg = ex.getMessage();
-                    }
-                    return msg;
-                }
-
-                @Override
-                protected void onPostExecute(String msg) {
-                	if (!TextUtils.isEmpty(msg)) {
-                		Toast.makeText(getActivity().getApplicationContext(), msg, Toast.LENGTH_LONG).show();
-                	}
-                }
-            }.execute(null, null, null);		
-    	}	
         
+    	private MainActivity getMainActivity() {
+    		return (MainActivity)getActivity();
+    	}
         
         public PlaceholderFragment() {
         }
@@ -238,14 +208,60 @@ public class MainActivity extends Activity
 				public void onClick(View v) {
 	    			String msg = msgEdit.getText().toString();
 	    			if (!TextUtils.isEmpty(msg)) {
+	           			mChattingDialog = ProgressDialog.show(getActivity(),"Working ...","Sending message to "+profileChatId,true,false,null);
+	           			btnSend.setEnabled(false);
 	    				send(msg);
+	    				
 	    				msgEdit.setText(null);
+	    				
 	    			}
 				}
 			});
             return rootView;
         }
+        private void doEndSendActivities() {
+        	btnSend.setEnabled(true);
+        	try {
+        		mChattingDialog.dismiss();
+        	} catch (Exception e) {}
+        }
+        Semaphore stick = new Semaphore(0);
+    	private void send(final String txt) {
+    		final String txt2=txt;
+            new AsyncTask<Void, Void, String>() {
+                @Override
+                protected String doInBackground(Void... params) {
+                    String msg = "";
+                    try {
+                    	msg = su.send(txt2, profileChatId,((ApplicationMassageNearby)getActivity().getApplication()),stick,(MainActivity)getActivity());
+                    	try {
+                    		stick.acquire();
+                    	} catch (Exception ee) {
+                    		String msgmsg="Message was not sent due to: " + ee.getMessage() + " Please try again.";
+                    		return msgmsg;
+                    	}
+            			ContentValues values = new ContentValues(2);
+            			values.put(DataProvider.COL_MSG, txt);
+            			values.put(DataProvider.COL_TO, profileChatId);
+            			getActivity().getContentResolver().insert(DataProvider.CONTENT_URI_MESSAGES, values);
+            			
+                    } catch (Exception ex) {
+                        msg = ex.getMessage();
+                    }
+                    return msg;
+                }
+
+                @Override
+                protected void onPostExecute(String msg) {
+                	doEndSendActivities();
+                	if (!TextUtils.isEmpty(msg)) {
+                		Toast.makeText(getActivity().getApplicationContext(), msg, Toast.LENGTH_LONG).show();
+                	}
+                }
+            }.execute(null, null, null);		
+    	}	
         
+
         @Override
 		public void onViewCreated(View view, Bundle savedInstanceState) {
 			super.onViewCreated(view, savedInstanceState);
@@ -291,8 +307,8 @@ public class MainActivity extends Activity
 		                	   final EditText mEditText=(EditText)Login.this.getDialog().findViewById(R.id.edittextloginid);
 		                	   MainActivity mMainActivity=(MainActivity)getActivity();
 		                	   new AcquireDataRemotelyAsynchronously("moi~"+ mEditText.getText().toString(), mMainActivity, mMainActivity);
-		           			   mMainActivity.mProgressDialog = ProgressDialog.show(getActivity(),"Searching ...","Logging in "+mEditText.getText().toString(),true,false,null);
-		                	   
+		           			   mMainActivity.mProgressDialog = ProgressDialog.show(getActivity(),"Working ...","Logging in "+mEditText.getText().toString(),true,false,null);
+		           			
 		                  }
 		               })
 		               .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -314,7 +330,7 @@ public class MainActivity extends Activity
 			String url=
 					key.equals("moi")?"http://listplus.no-ip.org/MassageNearby/Masseur.aspx"+"?Name="+URLEncoder.encode(name)+"&URL="+URLEncoder.encode(getLocalIpAddress()): (
 					key.equals("byebye")?"http://listplus.no-ip.org/MassageNearby/Masseur.aspx"+"?MasseurId="+ 
-						((ApplicationMassageNearby)getApplication()).mItemMasseur.mMasserId
+						((ApplicationMassageNearby)getApplication()).mItemMasseur.getmMasserId()
 							: (
 							"http://listplus.no-ip.org/MassageNearby/Masseur.aspx"
 							));

@@ -2,6 +2,8 @@ package com.diamond.android.massagenearby;
 
 import java.util.ArrayList;
 
+import com.diamond.android.massagenearby.model.ItemMasseur;
+
 import android.app.Activity;
 import android.app.Application;
 import android.content.SharedPreferences;
@@ -51,12 +53,12 @@ public class ApplicationMassageNearby extends Application {
 		}
 	}
 
-	public int getOrdinalOfMasseursHavingName(String name) {
+	public ItemMasseur getItemMasseurOfMasseursHavingName(String name) {
 		int x=0;
-		int retValue=-1;
+		ItemMasseur retValue=null;
 		for (Object masseur: this.mAllMasseurs) {
 			if(((ItemMasseur)masseur).getmName().equalsIgnoreCase(name)) {
-				retValue=x;
+				retValue=(ItemMasseur)masseur;
 				break;
 			}
 			x++;

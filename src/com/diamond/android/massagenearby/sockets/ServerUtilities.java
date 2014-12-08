@@ -27,13 +27,15 @@ import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import com.diamond.android.massagenearby.ApplicationMassageNearby;
 import com.diamond.android.massagenearby.DataProvider;
-import com.diamond.android.massagenearby.ItemMasseur;
 import com.diamond.android.massagenearby.MainActivity;
+import com.diamond.android.massagenearby.common.GlobalStaticValues;
+import com.diamond.android.massagenearby.model.ItemMasseur;
 
 
 import java.util.Map.Entry;
@@ -43,8 +45,6 @@ import java.util.concurrent.Semaphore;
 import android.content.ContentValues;
 import android.text.TextUtils;
 import android.util.Log;
-
-
 
 /**
  * Helper class used to communicate with the demo server.
@@ -60,7 +60,7 @@ public final class ServerUtilities {
     /**
      * Send a message.
      */
-    public  String send(String msg, String to, ApplicationMassageNearby amn,Semaphore stick,MainActivity ac) throws IOException {
+    public  String send(String msg, String to, ApplicationMassageNearby amn,Semaphore stick,MainActivity ac) throws Exception {
         //Log.i(TAG, "sending message (msg = " + msg + ")");
         Map<String, String> params = new HashMap<String, String>();
         params.put(ApplicationMassageNearby.MSG, msg);
@@ -71,33 +71,27 @@ public final class ServerUtilities {
     }
     
     /** Issue a POST with exponential backoff */
-    private  String post(Map<String, String> params, int maxAttempts,ApplicationMassageNearby amn, Semaphore stick, MainActivity ma) throws IOException {
+    private  String post(Map<String, String> params, int maxAttempts,ApplicationMassageNearby amn, Semaphore stick, MainActivity ma) throws Exception {
     	long backoff = BACKOFF_MILLI_SECONDS + random.nextInt(1000);
+    	Exception theLastIOExceptionOfTheBunch = null;
     	for (int i = 1; i <= maxAttempts; i++) {
     		Log.d(TAG, "Attempt #" + i + " to connect");
     		try {
-    			return executePost( params,amn, stick,ma);
+    			String retMsg=executePost( params,amn, ma);
+    			stick.release();
+    			return retMsg;
     		} catch (IOException e) {
+    			theLastIOExceptionOfTheBunch=e;
     			Log.e(TAG, "Failed on attempt " + i + ":" + e);
-    			if (i == maxAttempts) {
-    				throw e;
-                }
                 try {
                     Thread.sleep(backoff);
                 } catch (InterruptedException e1) {
-                    Thread.currentThread().interrupt();
-                    return null;
                 }
                 backoff *= 2;    			
-    		} catch (IllegalArgumentException e) {
-    			stick.release();
-    			throw new IOException(e.getMessage(), e);
-    		}
-    		finally {
-
     		}
     	}
-    	return null;
+		stick.release();
+		throw theLastIOExceptionOfTheBunch;
     }
 
     
@@ -109,30 +103,26 @@ public final class ServerUtilities {
      * @return response
      * @throws IOException propagated from POST.
      */
-    private String executePost(Map<String, String> params,ApplicationMassageNearby amn, Semaphore stick, MainActivity ma) throws IOException {
+    private String executePost(Map<String, String> params,ApplicationMassageNearby amn, MainActivity ma) throws IOException, InterruptedException {
     	String toId=params.get(ApplicationMassageNearby.TO);
     	ItemMasseur im=(ItemMasseur)amn.mAllMasseurs.get(Integer.valueOf(toId)-1);
-    	Semaphore stick2=new Semaphore(0);
-    	if(im.getmSocket()!=null) {
+    	if(im.ismConnected()) {
             PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(im.getmSocket()
                     .getOutputStream())), true);
-            // WHERE YOU ISSUE THE COMMANDS
-            out.println(amn.mItemMasseur.getmName()+"~"+params.get(ApplicationMassageNearby.MSG));
-      	 	stick.release();
+            out.println(amn.mItemMasseur.getmName()+"~"+amn.mItemMasseur.getmUserId()+"~"+GlobalStaticValues.COMMAND_HERES_MY_CHAT_MSG+"~"+params.get(ApplicationMassageNearby.MSG));     	 	
     	} else {
-    		
-            Thread cThread = new Thread(new ClientThread(im,amn,stick2,ma));
+        	Semaphore stick2=new Semaphore(0);
+        	ClientThread ct=new ClientThread(im,amn,stick2,ma);
+            Thread cThread = new Thread(ct);
             cThread.start();
-    		try {
-    			stick2.acquire();
+			stick2.acquire();
+			if(im.ismConnected()) {
                 PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(im.getmSocket()
                         .getOutputStream())), true);
-                // WHERE YOU ISSUE THE COMMANDS
-                out.println(amn.mItemMasseur.getmName()+"~"+params.get(ApplicationMassageNearby.MSG));
-           	 	stick.release();
-    		} catch (Exception e) {
-    			return "oops";
-    		}
+                out.println(amn.mItemMasseur.getmName()+"~"+amn.mItemMasseur.getmUserId()+"~"+GlobalStaticValues.COMMAND_HERES_MY_CHAT_MSG+"~"+params.get(ApplicationMassageNearby.MSG));
+			} else {
+				throw new IOException(ct.errMessage);
+			}
     	}
     	
     	/*
@@ -151,6 +141,7 @@ public final class ServerUtilities {
     	ApplicationMassageNearby mAmn;
     	Semaphore mStick2;
     	MainActivity mMa;
+    	String errMessage=null;
     	public ClientThread(ItemMasseur masseur,ApplicationMassageNearby amn, Semaphore stick2, MainActivity ma) {
     		mIpAddress=masseur.getmURL();
     		mMasseur=masseur;
@@ -167,12 +158,16 @@ public final class ServerUtilities {
                 mMasseur.setmConnected(true);
                 Thread cThread = new Thread(new ClientThreadReceive(mMasseur,mAmn,mMa));
                 cThread.start();
-               	mStick2.release();
-               
-            } catch (Exception e) {
+            } catch (UnknownHostException e) {
                 Log.e("ClientActivity", "C: Error", e);
-                mMasseur.setmConnected(false);
+                mMasseur.setmConnected(false);         
+                errMessage=e.getMessage();
+            } catch (IOException e) {
+                Log.e("ClientActivity", "C: Error", e);
+                mMasseur.setmConnected(false);                    
+                errMessage=e.getMessage();
             }
+           	mStick2.release();               
         }
     }
     public class ClientThreadReceive implements Runnable {
@@ -199,17 +194,16 @@ public final class ServerUtilities {
                         	if(!TextUtils.isEmpty(line)) {
 	                        	String[] sa=line.split("\\~", -1);
 	                        	String name=sa[0];
-	                        	String msg=sa[1];
-	                        	int profileChatId=mAmn.getOrdinalOfMasseursHavingName(name);
-	                        	String moi=mAmn.mItemMasseur.getmName();
-	                        	int profileChatIdMoi=mAmn.getOrdinalOfMasseursHavingName(moi);
-	                        	if(profileChatId!=-1) {
+	                        	String userId=sa[1];
+	                        	String command=sa[2];
+	                        	String msg=sa[3];
+                    			if(command.equals(GlobalStaticValues.COMMAND_HERES_MY_CHAT_MSG)) {
 		                			ContentValues values = new ContentValues(2);
 		                			values.put(DataProvider.COL_MSG, msg);
-		                			values.put(DataProvider.COL_FROM, String.valueOf(profileChatId+1));
-		                			values.put(DataProvider.COL_TO, String.valueOf(profileChatIdMoi+1));
+		                			values.put(DataProvider.COL_FROM, String.valueOf(userId));
+		                			values.put(DataProvider.COL_TO, String.valueOf(mAmn.mItemMasseur.getmUserId()));
 		                			mMa.getContentResolver().insert(DataProvider.CONTENT_URI_MESSAGES, values);
-	                        	}
+                        		}
                         	}
                         }
                     });

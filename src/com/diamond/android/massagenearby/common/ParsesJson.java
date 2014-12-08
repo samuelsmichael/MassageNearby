@@ -1,4 +1,4 @@
-package com.diamond.android.massagenearby;
+package com.diamond.android.massagenearby.common;
 
 import java.io.IOException;
 import java.util.ArrayList;

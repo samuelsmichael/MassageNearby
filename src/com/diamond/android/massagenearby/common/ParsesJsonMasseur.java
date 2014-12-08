@@ -1,9 +1,11 @@
-package com.diamond.android.massagenearby;
+package com.diamond.android.massagenearby.common;
 
 import java.util.ArrayList;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import com.diamond.android.massagenearby.model.ItemMasseur;
 
 public class ParsesJsonMasseur extends ParsesJson {
 	String mName;
