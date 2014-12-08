@@ -53,6 +53,18 @@ public class ApplicationMassageNearby extends Application {
 		}
 	}
 
+	public ItemMasseur getItemMasseurOfMasseursHavingUserId(int id) {
+		ItemMasseur retValue=null;
+		for (Object masseur: this.mAllMasseurs) {
+			if(((ItemMasseur)masseur).getmUserId()==id) {
+				retValue=(ItemMasseur)masseur;
+				break;
+			}
+		}
+			
+		return retValue;	
+	}
+	
 	public ItemMasseur getItemMasseurOfMasseursHavingName(String name) {
 		int x=0;
 		ItemMasseur retValue=null;

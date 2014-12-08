@@ -102,12 +102,16 @@ public class MainActivity extends Activity
     public void onNavigationDrawerItemSelected(int position) {
         // update the main content by replacing fragments
     	try {
-    		profileChatId=String.valueOf(position+1);
-
-        FragmentManager fragmentManager = getFragmentManager();
-        fragmentManager.beginTransaction()
-                .replace(R.id.container, PlaceholderFragment.newInstance(position + 1,((ApplicationMassageNearby)getApplication()).getSettingsManager()))
-                .commit();
+    		ArrayList aL=((ApplicationMassageNearby)getApplication()).mAllMasseurs;
+    		if(aL.size()>position) {
+	    		ItemMasseur im=(ItemMasseur)aL.get(position);
+	    		profileChatId=String.valueOf(im.getmUserId());
+	
+		        FragmentManager fragmentManager = getFragmentManager();
+		        fragmentManager.beginTransaction()
+	                .replace(R.id.container, PlaceholderFragment.newInstance(position + 1,((ApplicationMassageNearby)getApplication()).getSettingsManager()))
+	                .commit();
+    		}
     	} catch (Exception e) {}
     }
 
@@ -179,7 +183,6 @@ public class MainActivity extends Activity
             args.putInt(ARG_SECTION_NUMBER, sectionNumber);
             fragment.setArguments(args);
         	fragment.profileChatId=String.valueOf(sectionNumber);
-        	sm.setChatId(fragment.profileChatId);
             return fragment;
         }
         ServerUtilities su=new ServerUtilities();
@@ -206,9 +209,12 @@ public class MainActivity extends Activity
 				
 				@Override
 				public void onClick(View v) {
+					
+					ItemMasseur im=(ItemMasseur)((ApplicationMassageNearby)getActivity().getApplication()).mAllMasseurs.get(Integer.valueOf(profileChatId)-1);
+					
 	    			String msg = msgEdit.getText().toString();
 	    			if (!TextUtils.isEmpty(msg)) {
-	           			mChattingDialog = ProgressDialog.show(getActivity(),"Working ...","Sending message to "+profileChatId,true,false,null);
+	           			mChattingDialog = ProgressDialog.show(getActivity(),"Working ...","Sending message to "+String.valueOf(im.getmUserId()),true,false,null);
 	           			btnSend.setEnabled(false);
 	    				send(msg);
 	    				
@@ -233,7 +239,9 @@ public class MainActivity extends Activity
                 protected String doInBackground(Void... params) {
                     String msg = "";
                     try {
-                    	msg = su.send(txt2, profileChatId,((ApplicationMassageNearby)getActivity().getApplication()),stick,(MainActivity)getActivity());
+    					ItemMasseur im=(ItemMasseur)((ApplicationMassageNearby)getActivity().getApplication()).mAllMasseurs.get(Integer.valueOf(profileChatId)-1);
+
+                    	msg = su.send(txt2, String.valueOf(im.getmUserId()),((ApplicationMassageNearby)getActivity().getApplication()),stick,(MainActivity)getActivity());
                     	try {
                     		stick.acquire();
                     	} catch (Exception ee) {
@@ -242,7 +250,7 @@ public class MainActivity extends Activity
                     	}
             			ContentValues values = new ContentValues(2);
             			values.put(DataProvider.COL_MSG, txt);
-            			values.put(DataProvider.COL_TO, profileChatId);
+            			values.put(DataProvider.COL_TO,  /*bbhbb 51*/String.valueOf(im.getmUserId()));
             			getActivity().getContentResolver().insert(DataProvider.CONTENT_URI_MESSAGES, values);
             			
                     } catch (Exception ex) {
@@ -277,7 +285,7 @@ public class MainActivity extends Activity
 
 	@Override
 	public String getProfileChatId() {
-		return profileChatId;
+		return /*bbhbb 51*/ profileChatId;
 	}
 
     public class Login extends DialogFragment {
@@ -377,6 +385,8 @@ public class MainActivity extends Activity
 		if(data!=null && data.size()>0) {
 				if(key.equals("moi")) {
 					((ApplicationMassageNearby)getApplication()).mItemMasseur=(ItemMasseur)data.get(0);
+		        	getSettingsManager().setChatId(String.valueOf(((ApplicationMassageNearby)getApplication()).mItemMasseur.getmUserId()));
+
 					getSettingsManager().setCurrentUserName(((ApplicationMassageNearby)getApplication()).mItemMasseur.getmName());
 				} else {
 					if(key.equals("byebye")) {

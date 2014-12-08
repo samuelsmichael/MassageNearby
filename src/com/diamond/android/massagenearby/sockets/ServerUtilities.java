@@ -65,7 +65,7 @@ public final class ServerUtilities {
         Map<String, String> params = new HashMap<String, String>();
         params.put(ApplicationMassageNearby.MSG, msg);
         params.put(ApplicationMassageNearby.FROM, amn.getSettingsManager().getChatId());
-        params.put(ApplicationMassageNearby.TO, to);        
+        params.put(ApplicationMassageNearby.TO,/*bbhbb 51*/to);        
         
         return post(params, MAX_ATTEMPTS,amn, stick, ac);
     }
@@ -105,7 +105,7 @@ public final class ServerUtilities {
      */
     private String executePost(Map<String, String> params,ApplicationMassageNearby amn, MainActivity ma) throws IOException, InterruptedException {
     	String toId=params.get(ApplicationMassageNearby.TO);
-    	ItemMasseur im=(ItemMasseur)amn.mAllMasseurs.get(Integer.valueOf(toId)-1);
+    	ItemMasseur im = amn.getItemMasseurOfMasseursHavingUserId(Integer.valueOf(toId));
     	if(im.ismConnected()) {
             PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(im.getmSocket()
                     .getOutputStream())), true);
@@ -200,8 +200,8 @@ public final class ServerUtilities {
                     			if(command.equals(GlobalStaticValues.COMMAND_HERES_MY_CHAT_MSG)) {
 		                			ContentValues values = new ContentValues(2);
 		                			values.put(DataProvider.COL_MSG, msg);
-		                			values.put(DataProvider.COL_FROM, String.valueOf(userId));
-		                			values.put(DataProvider.COL_TO, String.valueOf(mAmn.mItemMasseur.getmUserId()));
+		                			values.put(DataProvider.COL_FROM,  /*bbhbb 51*/ String.valueOf(userId));
+		                			values.put(DataProvider.COL_TO, /*bbhbb  52*/ String.valueOf(mAmn.mItemMasseur.getmUserId()));
 		                			mMa.getContentResolver().insert(DataProvider.CONTENT_URI_MESSAGES, values);
                         		}
                         	}
