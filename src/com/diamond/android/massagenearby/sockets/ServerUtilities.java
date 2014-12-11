@@ -203,6 +203,12 @@ public final class ServerUtilities {
 		                			values.put(DataProvider.COL_FROM,  /*bbhbb 51*/ String.valueOf(userId));
 		                			values.put(DataProvider.COL_TO, /*bbhbb  52*/ String.valueOf(mAmn.mItemMasseur.getmUserId()));
 		                			mMa.getContentResolver().insert(DataProvider.CONTENT_URI_MESSAGES, values);
+		                			try {
+			                            PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(mMasseur.getmSocket()
+			                                    .getOutputStream())), true);
+			                            out.println(mAmn.mItemMasseur.getmName()+"~"+mAmn.mItemMasseur.getmUserId()+"~"+GlobalStaticValues.COMMAND_ACK+"~"); 
+		                			} catch (Exception e) {}
+
                         		}
                         	}
                         }

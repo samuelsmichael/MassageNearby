@@ -328,6 +328,15 @@ public class MainActivity extends Activity
 		        return builder.create();
         }		
     }
+    
+	private String getBaseURL() {
+		String ipAddress=getLocalIpAddress();
+		if(ipAddress.equals("fe80::cc3a:61ff:fe02:d1ac%p2p0")) {
+			return "10.0.0.253";
+		} else {
+			return "listplus.no-ip.org";
+		}
+	}
 	@Override
 	public ArrayList<Object> getRemoteData(String keynname) {
 		try {
@@ -336,11 +345,11 @@ public class MainActivity extends Activity
 			String name=array[1];
 			// 10.0.0.253 when wifi on my computer
 			String url=
-					key.equals("moi")?"http://listplus.no-ip.org/MassageNearby/Masseur.aspx"+"?Name="+URLEncoder.encode(name)+"&URL="+URLEncoder.encode(getLocalIpAddress()): (
-					key.equals("byebye")?"http://listplus.no-ip.org/MassageNearby/Masseur.aspx"+"?MasseurId="+ 
+					key.equals("moi")?"http://"+getBaseURL()+"/MassageNearby/Masseur.aspx"+"?Name="+URLEncoder.encode(name)+"&URL="+URLEncoder.encode(getLocalIpAddress()): (
+					key.equals("byebye")?"http://"+getBaseURL()+"/MassageNearby/Masseur.aspx"+"?MasseurId="+ 
 						((ApplicationMassageNearby)getApplication()).mItemMasseur.getmMasserId()
 							: (
-							"http://listplus.no-ip.org/MassageNearby/Masseur.aspx"
+							"http://"+getBaseURL()+"/MassageNearby/Masseur.aspx"
 							));
 			// Add your data
 
